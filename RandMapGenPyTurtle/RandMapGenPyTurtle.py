@@ -271,6 +271,7 @@ def load():
         # Lettura del file e parsing delle forme
         with open(shapes_file, "r") as f:
             shapes.clear()
+            
             for line in f:
                 if line.strip() != "-":
                     current_group.append(line.strip())
@@ -280,9 +281,19 @@ def load():
                         current_group = []
             if current_group:
                 shapes.append(current_group)
-
+        shapes_check()
     else:
         messagebox.showerror("Error", "The folder or files do not exist.")
+def shapes_check():
+    shapes_data.clear()
+    for shape in shapes:
+        dir_patterns=cont_check(shape)
+        shapes_data.append(dir_patterns)
+
+def shape_check(shape, shape_index):
+    shapes[shape_index] = shape
+    dir_patterns=cont_check(shape)
+    shapes_data[shape_index]=dir_patterns
 
 # Function to add the content of the file to the corresponding list
 def add():
@@ -629,10 +640,9 @@ def deleteselected(value):
             update_structure_labels()
 
 # Funzione per generare la mappa
-def generate(offsets=[0,0], chosen_dir="upper"):
+def generate(offsets=[0,0]):
     #random.seed(time.gmtime)
-    if offsets is None:
-        offsets = [0, 0]
+
     global turns, Outputs, selectedD, selectedS, random_direzione, random_struttura, programma, type1, type2, direzioni, strutture, OutputList
 
     for widget in mainframe.winfo_children():
@@ -647,6 +657,21 @@ def generate(offsets=[0,0], chosen_dir="upper"):
         random_struttura = "\n"
     if direzioni:
         random_direzione = random.choice(direzioni)
+        direzione_index=direzioni.index(random_direzione)
+        print("params",params)
+        if params:
+            Fullfilled=roation_check(direzioni.index(random_direzione), params)
+            while not Fullfilled:
+                print("direzione non trovata, ruotazione in corso...")
+                random_direzione = random.choice(direzioni)
+                Fullfilled=roation_check(direzioni.index(random_direzione), params)
+        #elif not first_time:
+            
+        shape = shapes[direzione_index]
+        data = shapes_data[direzione_index]
+        data.remove(invert_mat(chosen_dir, dir_mat))
+        
+
     else:
         random_direzione = "\n"
  
@@ -678,70 +703,63 @@ def generate(offsets=[0,0], chosen_dir="upper"):
     else:
         prev_dir_index = 0
     Outputs.append(random_direzione+random_struttura)
-    
-    
-
+   
     update_output_list()
     if turns:
         turnupdate()
-    draw_shape_for_direction(direzioni.index(random_direzione), prev_dir_index, offsets, chosen_dir)
+    #draw_shape_for_direction(direzioni.index(random_direzione), prev_dir_index, offsets, chosen_dir, prev_pos)
+    print("first time")
+    draw_shape_for_direction(shape, data, offsets)
 
 
-def draw_shape_for_direction(direction_index, prev_dir_index, offsets, chosen_dir, cell_size=10):
+
+def roation_check(direzione_index, params):
+    print("roation check")
+    required_dirs=params[0]
+    unrequired_dirs=params[1]
+    shape = shapes[direzione_index]
+    Fullfilled= False
+    for i in range(4):
+        req=0
+        for l in shapes_data[direzione_index]:
+            if  l in required_dirs or l not in unrequired_dirs:
+                req+=1
+                
+        if req == len(required_dirs)+len(unrequired_dirs):
+            Fullfilled=True
+            break
+        else:
+            print("direzione non trovata, ruotazione in corso...")
+            shape = rotate(shape)
+            shape_check(shape, direzione_index)
+    shapes[direzione_index] = shape
+    for i in shapes[direzione_index]:
+        print(i)
+    shapes_data[direzione_index] = cont_check(shape)
+    print("direzione trovata:", shapes_data[direzione_index])
+    return Fullfilled
+        
+
+def draw_shape_for_direction(shape, data, offsets, cell_size=10):
     #global offset_x, offset_y
+    global first_time
     if offsets is None:
         offsets = [0, 0]
     print("offsets:", offsets)
-    dir_mat=[["upper", "lower"], ["left", "right"]]
-    opp_chosen_dir=invert_mat(chosen_dir, dir_mat)
+    first_time= False
     turtle.speed(0)
     offset_x, offset_y = 0, 0
-    dir_patterns=[]
-    """
-    Cerca il pattern nella figura precedente. Se trovato, disegna tutta la figura corrente
-    (tutti i suoi "1") spostata rispetto alla precedente.
-    """
-    if direction_index < 0 or direction_index >= len(shapes):
-        print(str(direction_index) + " Indice direzione non valido " + str(len(shapes)))
-        return
 
-    shape = shapes[direction_index]
-    prev_shape = None
-    if direction_index > 0:
-        prev_shape = shapes[prev_dir_index]
-        print("Figura precedente trovata:", prev_shape)
-
-    # Se non c'è figura precedente, disegna sempre la figura
-    draw_all = prev_shape is None
-    draw_new = True
-    # Se c'è una figura precedente, cerca i pattern
-    if prev_shape and not draw_all:
-        dir_patterns, draw_all=cont_check(shape)
-        while opp_chosen_dir not in dir_patterns:
-            shape=rotate(shape)
-            dir_patterns, draw_all=cont_check(shape)
-            print("Pattern non trovato, ruotazione in corso...")
-            print(dir_patterns)
-        prev_dir_patterns, draw_all=cont_check(prev_shape)
-        dir_patterns.remove(opp_chosen_dir)
-        directions_window(dir_patterns)    
-        #offsets[0], offsets[1]=cont_check_pattern(shape, dir_patterns[0])
-        offset_x=int(offsets[0])*cell_size
-        offset_y=int(offsets[1])*cell_size
-    elif draw_all and not prev_shape:
-        print("Disegno figura senza pattern precedente")
-        dir_patterns, draw_all=cont_check(shape)
-        print("Pattern trovato:", dir_patterns)
-        
-        directions_window(dir_patterns)
-    if not draw_all:
-        # Pattern non trovato, non disegnare nulla
-        return
+    offset_x=int(offsets[0])*cell_size
+    offset_y=int(offsets[1])*cell_size
     print("Disegno figura con offset:", offset_x, offset_y)
     # Sposta la figura
     turtle.penup()
+    """    if offset_x==0 and offset_y == 0 and prev_shape:
+        offsets=direct_set_direction_offset(chosen_dir)
+        offset_x, offset_y = offsets[0], offsets[1]"""
     start_x, start_y = turtle.xcor() + offset_x, turtle.ycor() + offset_y
-
+    
     for row_idx, row in enumerate(shape):
         for col_idx, cell in enumerate(row):
             if cell == "1":
@@ -757,6 +775,7 @@ def draw_shape_for_direction(direction_index, prev_dir_index, offsets, chosen_di
                 turtle.penup()
     turtle.goto(start_x, start_y)
     turtle.setheading(0)
+    directions_window(shape, data, offsets)
 
 def rotate(shape):
     """
@@ -773,6 +792,7 @@ def rotate(shape):
     for i in rotated_shape:
         print(i)
     return rotated_shape
+
 def invert_mat(element, mat):
     """
     Inverte l'elemento nella matrice se è presente.
@@ -781,7 +801,6 @@ def invert_mat(element, mat):
         if element in mat[i]:
             return mat[i][mat[i].index(element)-1]
     print("Elemento non trovato nella matrice:", element)
-
 
 def cont_check(shape):
     draw_all= False
@@ -812,27 +831,17 @@ def cont_check(shape):
         #right_pattern=True
         dir_patterns.append("right")
         #offset_x = num_cols*cell_size  # Sposta verso destra di 5 celle"""
-    if dir_patterns:
-        draw_all = True
+    """if dir_patterns:
+        draw_all = True"""
     print("Pattern trovato:", dir_patterns)
-    return dir_patterns, draw_all
-
-def cont_check_pattern(shape, pattern):
+    return dir_patterns
+"""
+def cont_check_pattern(patterns, pattern):
     if pattern == "upper":
-        offset_x = 0
-        offset_y = len(shape)
-    elif pattern == "lower":
-        offset_x = 0
-        offset_y = -len(shape) 
-    elif pattern == "left":
-        offset_x = -len(shape[0]) 
-        offset_y = 0
-    elif pattern == "right":
-        offset_x = len(shape[0]) 
-        offset_y = 0
-    return offset_x, offset_y
+        
+    return offset_x, offset_y"""
 
-def  directions_window(dir_patterns ):
+def  directions_window(shape, dir_patterns, prev_pos):
     genbutt.configure(state="disabled")  # Disabilita il pulsante di generazione
     dir_window = CTkToplevel(root)
     dir_window.title("Choose a direction")
@@ -843,19 +852,22 @@ def  directions_window(dir_patterns ):
         button = CTkButton(dir_window, text=pattern)
         button.pack(pady=5)
         if pattern == "upper":
-            button.configure(command=lambda: set_direction_offset([0, len(shapes[0])], dir_window, "upper"))
+            button.configure(command=lambda: set_direction_offset([0, len(shapes[0])], dir_window, "upper", dir_patterns, prev_pos, shape))
             #button.configure(command=lambda: set_direction_offset([len(shapes[0]), 0], dir_window, "upper"))
         elif pattern == "lower":
-            button.configure(command=lambda: set_direction_offset([0, -len(shapes[0])], dir_window, "lower"))
+            button.configure(command=lambda: set_direction_offset([0, -len(shapes[0])], dir_window, "lower", dir_patterns, prev_pos, shape))
             #button.configure(command=lambda: set_direction_offset([-len(shapes[0]), 0], dir_window, "lower"))
         elif pattern == "left":
-            button.configure(command=lambda: set_direction_offset([-len(shapes[0]), 0], dir_window, "left"))
+            button.configure(command=lambda: set_direction_offset([-len(shapes[0]), 0], dir_window, "left", dir_patterns, prev_pos, shape))
             #button.configure(command=lambda: set_direction_offset([0, -len(shapes[0])], dir_window, "left"))
         elif pattern == "right":
-            button.configure(command=lambda: set_direction_offset([len(shapes[0]), 0], dir_window, "right"))
+            button.configure(command=lambda: set_direction_offset([len(shapes[0]), 0], dir_window, "right", dir_patterns, prev_pos, shape))
             #button.configure(command=lambda: set_direction_offset([0, len(shapes[0])], dir_window, "right"))
-def set_direction_offset(offsets, window, chosen_dir):
+
+
+def set_direction_offset(offsets, window, chos_dir, dir_patterns, prev_pos, shape):
     #global offset_x, offset_y
+    global params
     """
     Imposta l'offset di direzione in base alla lista di due interi fornita.
     offsets: lista di due interi [offset_x, offset_y]
@@ -863,14 +875,53 @@ def set_direction_offset(offsets, window, chosen_dir):
     if not isinstance(offsets, list) or len(offsets) != 2 or not all(isinstance(x, int) for x in offsets):
         raise ValueError("L'argomento deve essere una lista di due interi.")
     # Qui puoi implementare la logica per usare questi offset, ad esempio:
-
+    chosen_dir = chos_dir
+    x=prev_pos[0] + offsets[0]//len(shapes[0])
+    y=prev_pos[1] + offsets[1]//len(shapes[0])
+    Map_Matrix[x][y] = dir_patterns  # Aggiorna la matrice della mappa con la direzione scelta
+    required_dirs= [invert_mat(chosen_dir, dir_mat)]
+    unrequired_dirs=[]
+    for i in range(-1,2):
+        if i==0 or i==-offsets[0]/6 or i==-offsets[1]/6:
+            continue
+        if Map_Matrix[x+i][y] != []:
+            if dir_mat[0][i-1] in dir_patterns:
+                required_dirs.append(invert_mat(dir_mat[0][i-1], dir_mat))
+            else:
+                unrequired_dirs.append(invert_mat(dir_mat[0][i-1], dir_mat))
+        if Map_Matrix[x][y+i] != []:
+            if dir_mat[1][i-1] in dir_patterns:
+                required_dirs.append(invert_mat(dir_mat[1][i-1], dir_mat))
+            else:
+                unrequired_dirs.append(invert_mat(dir_mat[1][i-1], dir_mat))
+    params=[required_dirs, unrequired_dirs]
+    print("params:", params)
+    prev_pos=[x, y]
     #global offset_x, offset_y
     #offset_x, offset_y = offsets[0], offsets[1]
     window.destroy()  # Chiude la finestra delle direzioni
 
     print(f"Offset impostato a: x={offsets[0]}, y={offsets[1]}")
-    generate(offsets, chosen_dir)  # Chiama la funzione di generazione della mappa con i nuovi offset
+    #genbutt.configure(state="normal")
+    generate(offsets)  # Chiama la funzione di generazione della mappa con i nuovi offset
     
+def direct_set_direction_offset(chosen_dir):
+    offsets=[]
+    print("chosen_dir:", chosen_dir)
+    if chosen_dir == "upper":
+            offsets=[0, len(shapes[0])]
+            #button.configure(command=lambda: set_direction_offset([len(shapes[0]), 0], dir_window, "upper"))
+    elif chosen_dir == "lower":
+        offsets=[0, -len(shapes[0])]
+        #button.configure(command=lambda: set_direction_offset([-len(shapes[0]), 0], dir_window, "lower"))
+    elif chosen_dir == "left":
+        offsets=[-len(shapes[0]), 0]
+        #button.configure(command=lambda: set_direction_offset([0, -len(shapes[0])], dir_window, "left"))
+    elif chosen_dir == "right":
+        offsets=[len(shapes[0]), 0]
+        #button.configure(command=lambda: set_direction_offset([0, len(shapes[0])], dir_window, "right"))
+    # Qui puoi implementare la logica per usare questi offset, ad esempio:
+    return offsets
 
 def update_output_list():
     global turns, turn_var, OutputList
@@ -1064,6 +1115,12 @@ def settingswindow():
     CTkLabel(settingstabs.tab(translations[langvalue]["Language"]), text=translations[langvalue]["Language"]).grid(column=1, row=13, columnspan=1, sticky=customtkinter.W)
     
     settings_window.after(10, lambda: settings_window.focus())  # Ensure the window is focused after it's fully initialized
+
+def map_setup():
+    # Prepara Map_Matrix come una matrice quadrata di dimensioni Map_Size x Map_Size
+    for i in range(Map_Size):
+        Map_Matrix.append(["Free"] * Map_Size)
+    return Map_Size // 2
 #, , , , , , 
 def segmented_button_callback(value):
     if value == translations[langvalue]["Save"]:
@@ -1102,12 +1159,20 @@ selectedS = []
 direzioni = []
 strutture = []
 shapes = []
+shapes_data=[]
 Outputs = []
+Map_Matrix=[]
 selectedD_delete = []
 selectedS_delete = []
+dir_mat=[["upper", "lower"], ["left", "right"]]
 funzioni = ["eliminate", "skip"]
 programma = []
+prev_pos= [4, 0]  # Posizione iniziale
+params=[]
 turn_var = int()
+Map_Size= 10
+chosen_dir="upper"
+Map_Center=map_setup()
 once = customtkinter.BooleanVar(value=True)
 """offset_x=0
 offset_y=0"""
@@ -1118,7 +1183,7 @@ direzione_bool = customtkinter.BooleanVar(value=False)
 struttura_bool = customtkinter.BooleanVar(value=False)
 turns = customtkinter.BooleanVar(value=False)
 loaded = customtkinter.BooleanVar(value=False)
-rotated=False
+first_time=True
 folder_window_open = customtkinter.BooleanVar()
 turn_window_open = customtkinter.BooleanVar()
 folder_name_var = customtkinter.StringVar()
