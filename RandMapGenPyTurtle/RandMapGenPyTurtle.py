@@ -669,7 +669,9 @@ def generate(offsets=[0,0]):
             
         shape = shapes[direzione_index]
         data = shapes_data[direzione_index]
-        data.remove(invert_mat(chosen_dir, dir_mat))
+        element_to_remove = invert_mat(chosen_dir, dir_mat)
+        if element_to_remove in data:
+            data.remove(element_to_remove)
         
 
     else:
@@ -711,33 +713,40 @@ def generate(offsets=[0,0]):
     print("first time")
     draw_shape_for_direction(shape, data, offsets)
 
-
-
 def roation_check(direzione_index, params):
-    print("roation check")
-    required_dirs=params[0]
-    unrequired_dirs=params[1]
-    shape = shapes[direzione_index]
-    Fullfilled= False
+    required_dirs = params[0]
+    unrequired_dirs = params[1]
+    original_shape = shapes[direzione_index]
+    
+    # Prova tutte le 4 rotazioni
     for i in range(4):
-        req=0
-        for l in shapes_data[direzione_index]:
-            if  l in required_dirs or l not in unrequired_dirs:
-                req+=1
-                
-        if req == len(required_dirs)+len(unrequired_dirs):
-            Fullfilled=True
-            break
-        else:
-            print("direzione non trovata, ruotazione in corso...")
-            shape = rotate(shape)
-            shape_check(shape, direzione_index)
-    shapes[direzione_index] = shape
-    for i in shapes[direzione_index]:
-        print(i)
-    shapes_data[direzione_index] = cont_check(shape)
-    print("direzione trovata:", shapes_data[direzione_index])
-    return Fullfilled
+        current_shape = rotate_n_times(original_shape, i) # Funzione per ruotare di i * 90 gradi
+        dir_patterns = cont_check(current_shape)
+        
+        # Controlla se la rotazione attuale soddisfa i requisiti
+        fulfills_requirements = True
+        
+        # 1. Tutte le direzioni richieste devono essere presenti
+        if not all(req_dir in dir_patterns for req_dir in required_dirs):
+            fulfills_requirements = False
+        
+        # 2. Nessuna delle direzioni non richieste deve essere presente
+        if any(unreq_dir in dir_patterns for unreq_dir in unrequired_dirs):
+            fulfills_requirements = False
+
+        if fulfills_requirements:
+            shapes[direzione_index] = current_shape
+            shapes_data[direzione_index] = dir_patterns
+            return True
+            
+    # Se nessuna rotazione è valida, non fare modifiche e restituisci False
+    return False
+
+def rotate_n_times(shape, n):
+    rotated_shape = shape
+    for _ in range(n):
+        rotated_shape = rotate(rotated_shape)
+    return rotated_shape
         
 
 def draw_shape_for_direction(shape, data, offsets, cell_size=10):
@@ -878,7 +887,25 @@ def set_direction_offset(offsets, window, chos_dir, dir_patterns, prev_pos, shap
     chosen_dir = chos_dir
     x=prev_pos[0] + offsets[0]//len(shapes[0])
     y=prev_pos[1] + offsets[1]//len(shapes[0])
-    Map_Matrix[x][y] = dir_patterns  # Aggiorna la matrice della mappa con la direzione scelta
+    
+    
+    required_dirs, unrequired_dirs=mapcheck(offsets, dir_patterns)
+    """if required_dirs == [] and len(unrequired_dirs)==4:
+        required_dirs = [invert_mat(chosen_dir, dir_mat)]
+    else:
+        Map_Matrix[x][y] = dir_patterns  # Aggiorna la matrice della mappa con la direzione scelta"""
+    params=[required_dirs, unrequired_dirs]
+    print("params:", params)
+    prev_pos=[x, y]
+    #global offset_x, offset_y
+    #offset_x, offset_y = offsets[0], offsets[1]
+    window.destroy()  # Chiude la finestra delle direzioni
+
+    print(f"Offset impostato a: x={offsets[0]}, y={offsets[1]}")
+    #genbutt.configure(state="normal")
+    generate(offsets)  # Chiama la funzione di generazione della mappa con i nuovi offset
+    
+def mapcheck(offsets, dir_patterns):
     required_dirs= [invert_mat(chosen_dir, dir_mat)]
     unrequired_dirs=[]
     for i in range(-1,2):
@@ -894,17 +921,8 @@ def set_direction_offset(offsets, window, chos_dir, dir_patterns, prev_pos, shap
                 required_dirs.append(invert_mat(dir_mat[1][i-1], dir_mat))
             else:
                 unrequired_dirs.append(invert_mat(dir_mat[1][i-1], dir_mat))
-    params=[required_dirs, unrequired_dirs]
-    print("params:", params)
-    prev_pos=[x, y]
-    #global offset_x, offset_y
-    #offset_x, offset_y = offsets[0], offsets[1]
-    window.destroy()  # Chiude la finestra delle direzioni
+    return required_dirs, unrequired_dirs
 
-    print(f"Offset impostato a: x={offsets[0]}, y={offsets[1]}")
-    #genbutt.configure(state="normal")
-    generate(offsets)  # Chiama la funzione di generazione della mappa con i nuovi offset
-    
 def direct_set_direction_offset(chosen_dir):
     offsets=[]
     print("chosen_dir:", chosen_dir)
