@@ -280,7 +280,10 @@ def load():
                         shapes.append(current_group)
                         current_group = []
             if current_group:
-                shapes.append(current_group)
+                for i in range (4):
+                    shape=rotate_n_times(current_group, i)
+                    shapes.append(shape)
+                print(shapes)
         shapes_check()
     else:
         messagebox.showerror("Error", "The folder or files do not exist.")
@@ -643,39 +646,45 @@ def deleteselected(value):
 def generate(offsets=[0,0]):
     #random.seed(time.gmtime)
 
-    global turns, Outputs, selectedD, selectedS, random_direzione, random_struttura, programma, type1, type2, direzioni, strutture, OutputList
+    global turns, Outputs, selectedD, selectedS, random_struttura, programma, type1, type2, direzioni, strutture
 
     for widget in mainframe.winfo_children():
         if isinstance(widget, customtkinter.CTkCheckBox) and widget.winfo_ismapped():
             info = widget.grid_info()
             if info["column"] == 4:
                 widget.grid_forget()
+    
+    if params:
+        Filtered_shapes=filter_check(params)
+        Filtered_shapes_data=list_convert(Filtered_shapes, shapes_data)
 
     if strutture:
         random_struttura = random.choice(strutture)
     else:
         random_struttura = "\n"
-    if direzioni:
-        random_direzione = random.choice(direzioni)
-        direzione_index=direzioni.index(random_direzione)
-        print("params",params)
+    if shapes:
         if params:
-            Fullfilled=roation_check(direzioni.index(random_direzione), params)
-            while not Fullfilled:
-                print("direzione non trovata, ruotazione in corso...")
-                random_direzione = random.choice(direzioni)
-                Fullfilled=roation_check(direzioni.index(random_direzione), params)
-        #elif not first_time:
+            print("params:", params)
+            print("filtered shapes:", Filtered_shapes)
+            #random_direzione = random.choice(Filtered_dirs)
             
-        shape = shapes[direzione_index]
-        data = shapes_data[direzione_index]
+            shape = random.choice(Filtered_shapes)
+            direzione_index=Filtered_shapes.index(shape)
+            data = Filtered_shapes_data[direzione_index]
+        else:
+            shape = random.choice(shapes)
+            direzione_index=shapes.index(shape)
+            data = shapes_data[direzione_index]
+                #elif not first_time:
+            
+        
         element_to_remove = invert_mat(chosen_dir, dir_mat)
         if element_to_remove in data:
             data.remove(element_to_remove)
         
 
     else:
-        random_direzione = "\n"
+        pass
  
     if not once.get():
         deletesingle()
@@ -704,7 +713,7 @@ def generate(offsets=[0,0]):
         prev_dir_index = direzioni.index(Outputs[len(Outputs) - 1][0]+"\n")
     else:
         prev_dir_index = 0
-    Outputs.append(random_direzione+random_struttura)
+    #Outputs.append(random_direzione+random_struttura)
    
     update_output_list()
     if turns:
@@ -741,6 +750,28 @@ def roation_check(direzione_index, params):
             
     # Se nessuna rotazione è valida, non fare modifiche e restituisci False
     return False
+
+def filter_check(params):
+    required_dirs = params[0]
+    unrequired_dirs = params[1]
+    Filtered_shapes=[]
+    #Filtered_dirs=[]
+    for shape in shapes:
+        dir_patterns = cont_check(shape)
+        if all(req_dir in dir_patterns for req_dir in required_dirs) and not any(unreq_dir in dir_patterns for unreq_dir in unrequired_dirs):
+            Filtered_shapes.append(shape)
+            #Filtered_dirs.append(direzioni[shapes.index(shape)])
+    for shape in shapes:
+        print("Shape:")
+        for line in shape:
+            print(line)
+    return Filtered_shapes #, Filtered_dirs
+
+def list_convert(inlist, outlist):
+    new_list = []
+    for element in inlist:
+        new_list.append(outlist[inlist.index(element)])
+    return new_list
 
 def rotate_n_times(shape, n):
     rotated_shape = shape
@@ -874,6 +905,8 @@ def  directions_window(shape, dir_patterns, prev_pos):
             #button.configure(command=lambda: set_direction_offset([0, len(shapes[0])], dir_window, "right"))
 
 
+
+
 def set_direction_offset(offsets, window, chos_dir, dir_patterns, prev_pos, shape):
     #global offset_x, offset_y
     global params
@@ -888,8 +921,8 @@ def set_direction_offset(offsets, window, chos_dir, dir_patterns, prev_pos, shap
     x=prev_pos[0] + offsets[0]//len(shapes[0])
     y=prev_pos[1] + offsets[1]//len(shapes[0])
     
-    
-    required_dirs, unrequired_dirs=mapcheck(offsets, dir_patterns)
+    coords=(x, y)
+    required_dirs, unrequired_dirs=mapcheck(coords, offsets, dir_patterns)
     """if required_dirs == [] and len(unrequired_dirs)==4:
         required_dirs = [invert_mat(chosen_dir, dir_mat)]
     else:
@@ -905,19 +938,20 @@ def set_direction_offset(offsets, window, chos_dir, dir_patterns, prev_pos, shap
     #genbutt.configure(state="normal")
     generate(offsets)  # Chiama la funzione di generazione della mappa con i nuovi offset
     
-def mapcheck(offsets, dir_patterns):
+def mapcheck(coords, offsets, dir_patterns):
+    x, y = coords
     required_dirs= [invert_mat(chosen_dir, dir_mat)]
     unrequired_dirs=[]
     for i in range(-1,2):
-        if i==0 or i==-offsets[0]/6 or i==-offsets[1]/6:
+        if i==0 or i==-offsets[0]/len(shapes[0]) or i==-offsets[1]/len(shapes[0]):
             continue
         if Map_Matrix[x+i][y] != []:
-            if dir_mat[0][i-1] in dir_patterns:
+            if dir_mat[0][i-1] in dir_patterns and not dir_mat[0][i-1] in required_dirs:
                 required_dirs.append(invert_mat(dir_mat[0][i-1], dir_mat))
             else:
                 unrequired_dirs.append(invert_mat(dir_mat[0][i-1], dir_mat))
         if Map_Matrix[x][y+i] != []:
-            if dir_mat[1][i-1] in dir_patterns:
+            if dir_mat[1][i-1] in dir_patterns and not dir_mat[1][i-1] in required_dirs:
                 required_dirs.append(invert_mat(dir_mat[1][i-1], dir_mat))
             else:
                 unrequired_dirs.append(invert_mat(dir_mat[1][i-1], dir_mat))
@@ -942,15 +976,15 @@ def direct_set_direction_offset(chosen_dir):
     return offsets
 
 def update_output_list():
-    global turns, turn_var, OutputList
+    global turns, turn_var, random_struttura
     OutputList = CTkTextbox(mainframe, height=50, width=50, font=('Helvetica', 14), state="normal", border_width=3)
     OutputList.grid(column=1, row=4, sticky='WENS')
     OutputList.grid_propagate(False)
     if Outputs:
-        OutputList.insert("0.0","Direzione: " + random_direzione)
-        OutputList.insert("1.0","Struttura: " + random_struttura)
+        OutputList.insert("0.0","Struttura: " + random_struttura)
+        #OutputList.insert("1.0","Struttura: " + random_struttura)
     if turn_var:
-        OutputList.insert("3.0","Turni: " + str(turn_var))
+        OutputList.insert("1.0","Turni: " + str(turn_var))
     OutputList.configure(state="disabled")
     
 # Funzione per aggiungere una direzione
